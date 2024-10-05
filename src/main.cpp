@@ -7,26 +7,21 @@
 #include <vector>
 
 int main(int argc, char** argv) {
-    // Параметризация количества событий для обработки
     int events_to_process = 5;  // По умолчанию 5 событий
     if (argc > 1) {
         events_to_process = std::stoi(argv[1]);  // Получаем значение из аргумента командной строки
     }
 
-    // Создаем менеджер нод
     NodeManager node_manager;
-    node_manager.add_node("https://api.mainnet-beta.solana.com");
-    node_manager.add_node("https://api.devnet.solana.com");
+    node_manager.add_ip("72.46.84.7");
+    node_manager.add_ip("67.209.52.66");
 
-    // Создаем обработчик запросов
     RequestHandler request_handler(node_manager);
     EventHandler event_handler(request_handler);
 
-    // Создаем пул потоков
     ThreadPool pool(4);
     pool.Start();
 
-    // Создаем неблокирующую очередь событий
     UnboundedBlockingQueue<EventType> event_queue;
 
     // Добавляем несколько событий в очередь
@@ -34,7 +29,6 @@ int main(int argc, char** argv) {
         event_queue.Push(EventType::INVOKE);
     }
 
-    // Добавляем задачи в пул потоков
     pool.Submit([&event_queue, &event_handler, events_to_process] {
         std::vector<EventType> events;
 
@@ -42,7 +36,7 @@ int main(int argc, char** argv) {
         for (int i = 0; i < events_to_process; ++i) {
             auto event_opt = event_queue.Pop();
             if (event_opt) {
-                events.push_back(*event_opt);  // Добавляем событие в вектор
+                events.push_back(*event_opt);
             }
         }
 
@@ -50,7 +44,6 @@ int main(int argc, char** argv) {
         event_handler.handle_events(events);
     });
 
-    // Ждем выполнения задач
     std::this_thread::sleep_for(std::chrono::seconds(5));
     pool.Stop();
 

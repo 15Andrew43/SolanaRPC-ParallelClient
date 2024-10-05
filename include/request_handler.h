@@ -1,20 +1,18 @@
 #pragma once
 #include "node_manager.h"
 #include <string>
-#include <curl/curl.h>
 #include <vector>
+#include "event_types.h"
 
 class RequestHandler {
 public:
-    // Конструктор
+    // Конструктор, который принимает ссылку на NodeManager
     RequestHandler(NodeManager& node_manager);
 
-    // Выполнение GET-запроса к нодам и ожидание первого успешного
-    std::string invoke_request();
+    // Метод для обработки нескольких событий
+    std::string invoke_request(const std::vector<EventType>& events);
+
 
 private:
-    NodeManager& node_manager;
-
-    // Функция для записи данных из HTTP-ответа
-    static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp);
+    NodeManager& node_manager;  // Хранение ссылки на NodeManager
 };

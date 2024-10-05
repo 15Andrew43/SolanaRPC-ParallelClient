@@ -3,19 +3,19 @@
 #include <string>
 #include <mutex>
 
-// Менеджер для управления нодами
+// Менеджер для управления нодами по IP-адресам
 class NodeManager {
 public:
-    // Добавление ноды
-    void add_node(const std::string& url);
+    // Добавление ноды по IP-адресу
+    void add_ip(const std::string& ip);
 
-    // Удаление ноды
-    void remove_node(const std::string& url);
+    // Удаление ноды по IP-адресу
+    void remove_ip(const std::string& ip);
 
-    // Получение списка всех нод
-    std::vector<std::string> get_nodes() const;
+    // Получение списка всех нод (IP-адресов)
+    std::vector<std::string> get_ips() const;
 
 private:
-    std::vector<std::string> nodes;  // Список URL-ов нод
+    std::vector<std::string> ip_addresses;  // Список IP-адресов нод
     mutable std::mutex mtx;  // Мьютекс для защиты данных
 };
