@@ -1,6 +1,7 @@
 #include "request_handler.h"
 #include <iostream>
 #include <curl/curl.h>
+#include <unordered_map>
 
 // Конструктор
 RequestHandler::RequestHandler(NodeManager& node_manager) : node_manager(node_manager) {}
@@ -12,6 +13,7 @@ size_t RequestHandler::WriteCallback(void* contents, size_t size, size_t nmemb, 
 }
 
 // Выполнение GET-запроса к нодам и ожидание первого успешного
+
 std::string RequestHandler::invoke_request() {
     std::vector<std::string> urls = node_manager.get_nodes();  // Получаем список нод
 
@@ -31,7 +33,6 @@ std::string RequestHandler::invoke_request() {
         curl_easy_setopt(curl_handles[i], CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl_handles[i], CURLOPT_WRITEDATA, &responses[i]);
 
-        // Формируем запрос для метода getSlot
         const char* json_data = R"({"jsonrpc":"2.0","id":1,"method":"getSlot"})";
         curl_easy_setopt(curl_handles[i], CURLOPT_POSTFIELDS, json_data);
         curl_easy_setopt(curl_handles[i], CURLOPT_HTTPHEADER, nullptr);
@@ -39,7 +40,6 @@ std::string RequestHandler::invoke_request() {
         headers = curl_slist_append(headers, "Content-Type: application/json");
         curl_easy_setopt(curl_handles[i], CURLOPT_HTTPHEADER, headers);
 
-        // Добавляем в мульти-обработчик
         curl_multi_add_handle(multi_handle, curl_handles[i]);
     }
 
@@ -47,23 +47,19 @@ std::string RequestHandler::invoke_request() {
     CURLMsg* msg;
     int msgs_left = 0;
 
-    // Запуск параллельных запросов
     curl_multi_perform(multi_handle, &still_running);
 
-    // Ожидание первого успешного ответа
     while (still_running) {
         int numfds;
         curl_multi_wait(multi_handle, nullptr, 0, 1000, &numfds);
         curl_multi_perform(multi_handle, &still_running);
 
-        // Проверка завершенных запросов
         while ((msg = curl_multi_info_read(multi_handle, &msgs_left))) {
             if (msg->msg == CURLMSG_DONE) {
                 CURL* easy_handle = msg->easy_handle;
                 CURLcode result = msg->data.result;
 
                 if (result == CURLE_OK) {
-                    // Успешный запрос
                     char* url;
                     curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
                     std::string response;
@@ -76,11 +72,9 @@ std::string RequestHandler::invoke_request() {
                         }
                     }
 
-                    // Выводим информацию о самой быстрой ноде
                     std::cout << "Первый успешный ответ получен от ноды: " << fastest_node << std::endl;
                     std::cout << "Ответ: " << response << std::endl;
 
-                    // Удаляем остальные запросы
                     for (CURL* handle : curl_handles) {
                         if (handle != easy_handle) {
                             curl_multi_remove_handle(multi_handle, handle);
@@ -88,7 +82,6 @@ std::string RequestHandler::invoke_request() {
                         }
                     }
 
-                    // Возвращаем успешный ответ
                     curl_multi_cleanup(multi_handle);
                     return response;
                 }
@@ -96,7 +89,6 @@ std::string RequestHandler::invoke_request() {
         }
     }
 
-    // Очищаем все запросы, если нет успешных
     for (CURL* handle : curl_handles) {
         curl_multi_remove_handle(multi_handle, handle);
         curl_easy_cleanup(handle);
