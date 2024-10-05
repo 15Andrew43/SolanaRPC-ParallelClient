@@ -12,8 +12,10 @@ add_executable(SolanaRPCParallelClient
     src/node_manager.cpp
     src/request_handler.cpp
     src/event_handler.cpp
+    src/thread_pool.cpp
+    src/thread_safe_event_queue.cpp
 )
 
-# Линковка с libcurl
+# Линковка с libcurl и pthread
 find_package(CURL REQUIRED)
-target_link_libraries(SolanaRPCParallelClient CURL::libcurl)
+target_link_libraries(SolanaRPCParallelClient CURL::libcurl pthread)
