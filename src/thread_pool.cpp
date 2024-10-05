@@ -1,51 +1,44 @@
 #include "thread_pool.h"
+#include <cassert>
 
-// Конструктор, запускающий потоки
-ThreadPool::ThreadPool(size_t num_threads) : stop(false) {
-    for (size_t i = 0; i < num_threads; ++i) {
-        workers.emplace_back([this] { this->worker_thread(); });
+// Конструктор
+ThreadPool::ThreadPool(size_t threads)
+    : threads_(threads) {}
+
+// Запуск потоков
+void ThreadPool::Start() {
+    for (size_t i = 0; i < threads_; ++i) {
+        workers_.emplace_back([this] { Worker(); });
     }
 }
 
-// Деструктор, завершающий работу потоков
+// Деструктор
 ThreadPool::~ThreadPool() {
-    {
-        std::lock_guard<std::mutex> lock(tasks_mutex);
-        stop = true;
-    }
-    condition.notify_all();  // Оповещаем все потоки
-
-    for (std::thread &worker : workers) {
+    Stop();  // Остановка пула при завершении программы
+    for (std::thread& worker : workers_) {
         if (worker.joinable()) {
-            worker.join();  // Ждем завершения всех потоков
+            worker.join();
         }
     }
 }
 
 // Добавление задачи в пул
-void ThreadPool::enqueue_task(std::function<void()> task) {
-    {
-        std::lock_guard<std::mutex> lock(tasks_mutex);
-        tasks.emplace(task);
-    }
-    condition.notify_one();  // Оповещаем один поток о новой задаче
+void ThreadPool::Submit(std::function<void()> task) {
+    tasks_.Push(std::move(task));  // Добавляем задачу в очередь
 }
 
-// Рабочий поток
-void ThreadPool::worker_thread() {
-    while (true) {
-        std::function<void()> task;
-        {
-            std::unique_lock<std::mutex> lock(tasks_mutex);
-            condition.wait(lock, [this] { return stop || !tasks.empty(); });
+// Остановка пула
+void ThreadPool::Stop() {
+    tasks_.Close();  // Закрываем очередь задач
+    stop_ = true;
+}
 
-            if (stop && tasks.empty()) {
-                return;
-            }
-
-            task = std::move(tasks.front());
-            tasks.pop();
+// Воркер, который выполняет задачи из очереди
+void ThreadPool::Worker() {
+    while (!stop_) {
+        auto task = tasks_.Pop();  // Попытка извлечь задачу
+        if (task) {
+            (*task)();  // Выполняем задачу
         }
-        task();  // Выполняем задачу
     }
 }

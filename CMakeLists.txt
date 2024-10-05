@@ -13,7 +13,7 @@ add_executable(SolanaRPCParallelClient
     src/request_handler.cpp
     src/event_handler.cpp
     src/thread_pool.cpp
-    src/thread_safe_event_queue.cpp
+    include/unbounded_blocking_queue.h
 )
 
 # Линковка с libcurl и pthread
