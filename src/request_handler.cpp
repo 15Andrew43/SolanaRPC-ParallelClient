@@ -1,16 +1,25 @@
-#include <curl/curl.h>
+#include "request_handler.h"
 #include <iostream>
-#include <vector>
-#include "thread_pool.h"
+#include <curl/curl.h>
 
-// Функция для записи данных из ответа HTTP-запроса
-static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp) {
+// Конструктор
+RequestHandler::RequestHandler(NodeManager& node_manager) : node_manager(node_manager) {}
+
+// Функция для записи данных из HTTP-ответа
+size_t RequestHandler::WriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp) {
     userp->append((char*)contents, size * nmemb);
     return size * nmemb;
 }
 
-// Реализация функции для отправки 3 запросов и ожидания первого успешного ответа
-std::string ThreadPool::send_requests(const std::vector<std::string>& urls) {
+// Выполнение GET-запроса к нодам и ожидание первого успешного
+std::string RequestHandler::invoke_request() {
+    std::vector<std::string> urls = node_manager.get_nodes();  // Получаем список нод
+
+    if (urls.empty()) {
+        std::cerr << "Нет доступных нод" << std::endl;
+        return "";
+    }
+
     CURLM* multi_handle = curl_multi_init();
     std::vector<CURL*> curl_handles(urls.size());
     std::vector<std::string> responses(urls.size());
@@ -21,6 +30,16 @@ std::string ThreadPool::send_requests(const std::vector<std::string>& urls) {
         curl_easy_setopt(curl_handles[i], CURLOPT_URL, urls[i].c_str());
         curl_easy_setopt(curl_handles[i], CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl_handles[i], CURLOPT_WRITEDATA, &responses[i]);
+
+        // Формируем запрос для метода getSlot
+        const char* json_data = R"({"jsonrpc":"2.0","id":1,"method":"getSlot"})";
+        curl_easy_setopt(curl_handles[i], CURLOPT_POSTFIELDS, json_data);
+        curl_easy_setopt(curl_handles[i], CURLOPT_HTTPHEADER, nullptr);
+        struct curl_slist *headers = nullptr;
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+        curl_easy_setopt(curl_handles[i], CURLOPT_HTTPHEADER, headers);
+
+        // Добавляем в мульти-обработчик
         curl_multi_add_handle(multi_handle, curl_handles[i]);
     }
 
@@ -28,7 +47,7 @@ std::string ThreadPool::send_requests(const std::vector<std::string>& urls) {
     CURLMsg* msg;
     int msgs_left = 0;
 
-    // Запуск запросов
+    // Запуск параллельных запросов
     curl_multi_perform(multi_handle, &still_running);
 
     // Ожидание первого успешного ответа
@@ -48,12 +67,18 @@ std::string ThreadPool::send_requests(const std::vector<std::string>& urls) {
                     char* url;
                     curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &url);
                     std::string response;
+                    std::string fastest_node;
                     for (size_t i = 0; i < curl_handles.size(); ++i) {
                         if (curl_handles[i] == easy_handle) {
                             response = responses[i];
+                            fastest_node = urls[i];
                             break;
                         }
                     }
+
+                    // Выводим информацию о самой быстрой ноде
+                    std::cout << "Первый успешный ответ получен от ноды: " << fastest_node << std::endl;
+                    std::cout << "Ответ: " << response << std::endl;
 
                     // Удаляем остальные запросы
                     for (CURL* handle : curl_handles) {
