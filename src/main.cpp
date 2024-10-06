@@ -5,11 +5,13 @@
 #include "unbounded_blocking_queue.h"
 #include <iostream>
 #include <vector>
+#include <thread>
+#include <chrono>
 
 int main(int argc, char** argv) {
-    int events_to_process = 5;  // По умолчанию 5 событий
+    int events_to_process = 5;  // Default number of events per task
     if (argc > 1) {
-        events_to_process = std::stoi(argv[1]);  // Получаем значение из аргумента командной строки
+        events_to_process = std::stoi(argv[1]);  // Get value from command line argument
     }
 
     NodeManager node_manager;
@@ -19,32 +21,44 @@ int main(int argc, char** argv) {
     RequestHandler request_handler(node_manager);
     EventHandler event_handler(request_handler);
 
-    ThreadPool pool(4);
+    int n_threads = 4;
+    ThreadPool pool(n_threads);
     pool.Start();
 
     UnboundedBlockingQueue<EventType> event_queue;
 
-    // Добавляем несколько событий в очередь
-    for (int i = 0; i < 10; ++i) {
+    // Add events to the queue
+    const int total_events = 30;
+    for (int i = 0; i < total_events; ++i) {
         event_queue.Push(EventType::INVOKE);
     }
 
-    pool.Submit([&event_queue, &event_handler, events_to_process] {
-        std::vector<EventType> events;
+    // Creating multiple tasks in the pool, each processing a set of events
+    const int task_count = 6;
+    for (int t = 0; t < task_count; ++t) {
+        pool.Submit([&event_queue, &event_handler, events_to_process, t] {
+            std::vector<EventType> events;
 
-        // Извлекаем заданное количество событий из очереди
-        for (int i = 0; i < events_to_process; ++i) {
-            auto event_opt = event_queue.Pop();
-            if (event_opt) {
-                events.push_back(*event_opt);
+            // Fetch a specific number of events for each task
+            for (int i = 0; i < events_to_process; ++i) {
+                auto event_opt = event_queue.Pop();
+                if (event_opt) {
+                    events.push_back(*event_opt);
+                }
             }
-        }
 
-        // Обрабатываем события
-        event_handler.handle_events(events);
-    });
+            // If we have events, process them in a thread
+            if (!events.empty()) {
+                std::cout << "Thread " << t << " is processing " << events.size() << " events\n";
+                event_handler.handle_events(events);
+            }
+        });
+    }
 
+    // Allow time for tasks to process
     std::this_thread::sleep_for(std::chrono::seconds(5));
+
+    // Stop the thread pool after processing
     pool.Stop();
 
     return 0;

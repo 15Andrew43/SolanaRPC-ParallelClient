@@ -1,4 +1,5 @@
 #include "node_manager.h"
+#include <algorithm>
 
 // Добавление ноды по IP-адресу
 void NodeManager::add_ip(const std::string& ip) {

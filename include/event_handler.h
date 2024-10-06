@@ -1,22 +1,17 @@
-#pragma once
 #include "request_handler.h"
-#include <unordered_map>
-#include <vector>
-#include "event_types.h"
+#include "requests_container.h"
 
-class IEventHandler {
-public:
-    virtual void handle_events(const std::vector<EventType>& events) = 0;
-    virtual ~IEventHandler() {}
-};
-
-class EventHandler : public IEventHandler {
+class EventHandler {
 public:
     EventHandler(RequestHandler& request_handler);
 
-    // Обработка нескольких событий
-    void handle_events(const std::vector<EventType>& events) override;
+    // Обработка событий
+    void handle_events(const std::vector<EventType>& events);
+
+    // Получение самого старого результата
+    RequestResult get_oldest_result();
 
 private:
     RequestHandler& request_handler;
+    RequestsContainer requests_container;  // Контейнер для хранения результатов запросов
 };
