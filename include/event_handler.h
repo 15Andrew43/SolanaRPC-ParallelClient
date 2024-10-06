@@ -1,5 +1,5 @@
 #include "request_handler.h"
-#include "requests_container.h"
+#include "responses_container.h"
 
 class EventHandler {
 public:
@@ -9,9 +9,9 @@ public:
     void handle_events(const std::vector<EventType>& events);
 
     // Получение самого старого результата
-    RequestResult get_oldest_result();
+    ResponseResult get_oldest_result();
 
 private:
     RequestHandler& request_handler;
-    RequestsContainer requests_container;  // Контейнер для хранения результатов запросов
+    ResponsesContainer responses_container;  // Контейнер для хранения результатов запросов
 };

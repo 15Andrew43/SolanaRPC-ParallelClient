@@ -1,5 +1,5 @@
 #include "request_handler.h"
-#include "requests_container.h"
+#include "responses_container.h"
 #include <arpa/inet.h>  // Для inet_pton
 #include <sys/epoll.h>
 #include <netinet/in.h>
@@ -124,7 +124,7 @@ std::string RequestHandler::invoke_request(const std::vector<EventType>& events)
 
                     auto now = std::chrono::steady_clock::now();
                     std::chrono::milliseconds latency = std::chrono::duration_cast<std::chrono::milliseconds>(now - sock_info->start_time);
-                    requests_container.add_result(body, now, latency);
+                    responses_container.add_response(body, now, latency);
 
                     std::cout << "Ответ получил поток: " << std::this_thread::get_id() << "\n";
                     std::cout << "Тело ответа: " << body << "\n";
