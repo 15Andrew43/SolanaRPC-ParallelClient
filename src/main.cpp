@@ -9,9 +9,9 @@
 #include <chrono>
 
 int main(int argc, char** argv) {
-    int events_to_process = 5;  // Default number of events per task
+    int events_to_process = 5;  
     if (argc > 1) {
-        events_to_process = std::stoi(argv[1]);  // Get value from command line argument
+        events_to_process = std::stoi(argv[1]);  
     }
 
     NodeManager node_manager;
@@ -27,19 +27,19 @@ int main(int argc, char** argv) {
 
     UnboundedBlockingQueue<EventType> event_queue;
 
-    // Add events to the queue
+    
     const int total_events = 30;
     for (int i = 0; i < total_events; ++i) {
         event_queue.Push(EventType::INVOKE);
     }
 
-    // Creating multiple tasks in the pool, each processing a set of events
+    
     const int task_count = 6;
     for (int t = 0; t < task_count; ++t) {
         pool.Submit([&event_queue, &event_handler, events_to_process, t] {
             std::vector<EventType> events;
 
-            // Fetch a specific number of events for each task
+            
             for (int i = 0; i < events_to_process; ++i) {
                 auto event_opt = event_queue.Pop();
                 if (event_opt) {
@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
                 }
             }
 
-            // If we have events, process them in a thread
+            
             if (!events.empty()) {
                 std::cout << "Thread " << t << " is processing " << events.size() << " events\n";
                 event_handler.handle_events(events);
@@ -55,10 +55,10 @@ int main(int argc, char** argv) {
         });
     }
 
-    // Allow time for tasks to process
+    
     std::this_thread::sleep_for(std::chrono::seconds(5));
 
-    // Stop the thread pool after processing
+    
     pool.Stop();
 
     return 0;

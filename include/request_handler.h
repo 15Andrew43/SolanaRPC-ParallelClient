@@ -1,7 +1,7 @@
 #pragma once
 
 #include "responses_container.h"
-#include "event_types.h"  // Убедитесь, что EventType определен в этом файле
+#include "event_types.h"  
 #include "node_manager.h"
 #include <vector>
 

@@ -7,37 +7,37 @@
 template <typename T>
 class UnboundedBlockingQueue {
 public:
-    // Добавление элемента в очередь
+    
     void Push(T item) {
         std::lock_guard<std::mutex> lock(mutex_);
         if (is_closed_) {
             return;
         }
         buffer_.push_back(std::move(item));
-        not_empty_.notify_one();  // Уведомляем, что очередь непуста
+        not_empty_.notify_one();  
     }
 
-    // Извлечение элемента из очереди
+    
     std::optional<T> Pop() {
         std::unique_lock<std::mutex> lock(mutex_);
         while (!is_closed_ && buffer_.empty()) {
-            not_empty_.wait(lock);  // Ждем, пока не появится элемент
+            not_empty_.wait(lock);  
         }
         if (is_closed_ && buffer_.empty()) {
             return std::nullopt;
         }
-        return TakeLocked();  // Извлекаем элемент
+        return TakeLocked();  
     }
 
-    // Закрытие очереди
+    
     void Close() {
         std::lock_guard<std::mutex> lock(mutex_);
         is_closed_ = true;
-        not_empty_.notify_all();  // Оповещаем всех, чтобы завершить работу
+        not_empty_.notify_all();  
     }
 
 private:
-    // Извлечение элемента при заблокированной очереди
+    
     T TakeLocked() {
         auto top = std::move(buffer_.front());
         buffer_.pop_front();

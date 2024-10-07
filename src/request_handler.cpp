@@ -1,6 +1,6 @@
 #include "request_handler.h"
 #include "responses_container.h"
-#include <arpa/inet.h>  // Для inet_pton
+#include <arpa/inet.h>  
 #include <sys/epoll.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -13,20 +13,22 @@
 #include <thread>
 #include <chrono>
 
-// Структура для хранения информации о сокетах
+
 struct SocketInfo {
     int sockfd;
     int event_id;
     bool request_sent = false;
-    std::chrono::steady_clock::time_point start_time;  // Добавляем время начала для каждого сокета
+    std::chrono::steady_clock::time_point start_time;  
 };
 
 RequestHandler::RequestHandler(NodeManager& node_manager) : node_manager(node_manager) {}
+
 
 int set_non_blocking(int sockfd) {
     int flags = fcntl(sockfd, F_GETFL, 0);
     return fcntl(sockfd, F_SETFL, flags | O_NONBLOCK);
 }
+
 
 void send_http_request(int sockfd) {
     const char* request = 
@@ -39,43 +41,44 @@ void send_http_request(int sockfd) {
 
     ssize_t bytes_sent = send(sockfd, request, strlen(request), 0);
     if (bytes_sent < 0) {
-        std::cerr << "Ошибка при отправке HTTP запроса\n";
+        std::cerr << "Error sending HTTP request\n";
     } else {
-        std::cout << "HTTP запрос отправлен (" << bytes_sent << " байт)\n";
+        std::cout << "HTTP request sent (" << bytes_sent << " bytes)\n";
     }
 }
+
 
 std::string extract_http_body(const std::string& response) {
     size_t pos = response.find("\r\n\r\n");
     if (pos != std::string::npos) {
-        return response.substr(pos + 4);  // Пропускаем заголовки и получаем только body
+        return response.substr(pos + 4);  
     }
-    return "";  // Если не найден разделитель заголовков и тела
+    return "";  
 }
 
-// Основная функция для обработки запросов с потокобезопасным хранением результатов
+
 std::string RequestHandler::invoke_request(const std::vector<EventType>& events) {
     int epoll_fd = epoll_create1(0);
     if (epoll_fd == -1) {
-        std::cerr << "Ошибка создания epoll" << std::endl;
-        return "Ошибка";
+        std::cerr << "Error creating epoll" << std::endl;
+        return "Error";
     }
 
     std::unordered_map<int, std::vector<SocketInfo>> event_socket_map;  
-    std::vector<epoll_event> epoll_events(10);  // Для хранения epoll событий
+    std::vector<epoll_event> epoll_events(10);  
     int event_id = 0;
 
-    // Для каждого события создаем сокеты и добавляем их в epoll
+    
     for (const auto& event : events) {
         std::vector<SocketInfo> event_sockets;
 
-        // Считаем время начала обработки для каждой группы событий
+        
         auto start_time = std::chrono::steady_clock::now();
 
         for (const auto& ip_url : node_manager.get_ips()) {
             int sockfd = socket(AF_INET, SOCK_STREAM, 0);
             if (sockfd == -1) {
-                std::cerr << "Ошибка создания сокета для " << ip_url << std::endl;
+                std::cerr << "Error creating socket for " << ip_url << std::endl;
                 continue;
             }
             set_non_blocking(sockfd);
@@ -88,7 +91,7 @@ std::string RequestHandler::invoke_request(const std::vector<EventType>& events)
             connect(sockfd, (sockaddr*)&server_addr, sizeof(server_addr));
 
             epoll_event epoll_event;
-            SocketInfo* sock_info = new SocketInfo{sockfd, event_id, false, start_time};  // Добавляем start_time в SocketInfo
+            SocketInfo* sock_info = new SocketInfo{sockfd, event_id, false, start_time};  
             epoll_event.data.ptr = sock_info;
             epoll_event.events = EPOLLIN | EPOLLOUT | EPOLLET;
             epoll_ctl(epoll_fd, EPOLL_CTL_ADD, sockfd, &epoll_event);
@@ -98,7 +101,7 @@ std::string RequestHandler::invoke_request(const std::vector<EventType>& events)
         event_socket_map[event_id++] = event_sockets;
     }
 
-    // Основной цикл ожидания событий
+    
     while (!event_socket_map.empty()) {
         int n = epoll_wait(epoll_fd, epoll_events.data(), epoll_events.size(), -1);
         for (int i = 0; i < n; ++i) {
@@ -106,13 +109,13 @@ std::string RequestHandler::invoke_request(const std::vector<EventType>& events)
             int sockfd = sock_info->sockfd;
             int current_event_id = sock_info->event_id;
 
-            // Если сокет готов к записи, отправляем запрос
+            
             if (epoll_events[i].events & EPOLLOUT && !sock_info->request_sent) {
                 send_http_request(sockfd);
                 sock_info->request_sent = true;
             }
 
-            // Если сокет готов к чтению, получаем ответ
+            
             if (epoll_events[i].events & EPOLLIN) {
                 char buffer[4096];
                 ssize_t bytes = read(sockfd, buffer, sizeof(buffer));
@@ -126,11 +129,11 @@ std::string RequestHandler::invoke_request(const std::vector<EventType>& events)
                     std::chrono::milliseconds latency = std::chrono::duration_cast<std::chrono::milliseconds>(now - sock_info->start_time);
                     responses_container.add_response(body, now, latency);
 
-                    std::cout << "Ответ получил поток: " << std::this_thread::get_id() << "\n";
-                    std::cout << "Тело ответа: " << body << "\n";
-                    std::cout << "Идентификатор события (event_id): " << current_event_id << "\n";
+                    std::cout << "Response received by thread: " << std::this_thread::get_id() << "\n";
+                    std::cout << "Response body: " << body << "\n";
+                    std::cout << "Event ID: " << current_event_id << "\n";
 
-                    // Удаляем все сокеты для текущего события
+                    
                     for (const auto& info : event_socket_map[current_event_id]) {
                         if (info.sockfd != sockfd) {
                             epoll_ctl(epoll_fd, EPOLL_CTL_DEL, info.sockfd, nullptr);
@@ -149,5 +152,5 @@ std::string RequestHandler::invoke_request(const std::vector<EventType>& events)
     }
 
     close(epoll_fd);
-    return "Все запросы завершены";
+    return "All requests completed";
 }

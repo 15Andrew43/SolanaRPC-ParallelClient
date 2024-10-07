@@ -1,20 +1,20 @@
 #include "node_manager.h"
 #include <algorithm>
 
-// Добавление ноды по IP-адресу
+
 void NodeManager::add_ip(const std::string& ip) {
-    std::lock_guard<std::mutex> lock(mtx);  // Блокировка мьютекса
-    ip_addresses.push_back(ip);  // Добавляем IP в список
+    std::lock_guard<std::mutex> lock(mtx);  
+    ip_addresses.push_back(ip);  
 }
 
-// Удаление ноды по IP-адресу
+
 void NodeManager::remove_ip(const std::string& ip) {
-    std::lock_guard<std::mutex> lock(mtx);  // Блокировка мьютекса
+    std::lock_guard<std::mutex> lock(mtx);  
     ip_addresses.erase(std::remove(ip_addresses.begin(), ip_addresses.end(), ip), ip_addresses.end());
 }
 
-// Получение списка всех нод (IP-адресов)
+
 std::vector<std::string> NodeManager::get_ips() const {
-    std::lock_guard<std::mutex> lock(mtx);  // Блокировка мьютекса
-    return ip_addresses;  // Возвращаем копию списка IP-адресов
+    std::lock_guard<std::mutex> lock(mtx);  
+    return ip_addresses;  
 }
